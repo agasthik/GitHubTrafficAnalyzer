@@ -1,0 +1,137 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Serverless GitHub traffic tracker that archives daily traffic metrics
+  and exposes a lightweight dashboard.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 1024
+    Tracing: Active
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref TrafficArchiveTable
+        TRACKED_REPOSITORIES: !Ref TrackedRepositories
+
+Parameters:
+  GitHubTokenSecretName:
+    Type: String
+    Default: github-traffic-token
+    Description: Secrets Manager secret name or ARN containing the GitHub token.
+  TrackedRepositories:
+    Type: String
+    Default: >
+      [{"owner":"your-org","name":"your-repo","label":"Your Repository"}]
+    Description: >
+      JSON array of repositories to track. The default is a placeholder — override
+      it (via samconfig.toml or --parameter-overrides) with repositories your
+      GitHub token can read traffic for.
+  DashboardCorsOrigin:
+    Type: String
+    Default: "*"
+    Description: Origin allowed to call the dashboard API.
+
+Resources:
+  ResourceGroup:
+    Type: AWS::ResourceGroups::Group
+    Properties:
+      Name: !Ref AWS::StackName
+      Description: All resources for the GitHub Traffic Analyzer stack.
+      ResourceQuery:
+        Type: CLOUDFORMATION_STACK_1_0
+
+  TrafficArchiveTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  DashboardApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowMethods:
+          - GET
+        AllowOrigins:
+          - !Ref DashboardCorsOrigin
+        AllowHeaders:
+          - content-type
+
+  CollectorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: github_traffic_analyzer.handlers.collector.handler
+      Description: Fetches GitHub traffic data and archives it in DynamoDB.
+      Environment:
+        Variables:
+          GITHUB_TOKEN_SECRET_NAME: !Ref GitHubTokenSecretName
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TrafficArchiveTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GitHubTokenSecretName}*
+      Events:
+        DailyCollection:
+          Type: Schedule
+          Properties:
+            Description: Collect GitHub traffic once per day.
+            Schedule: cron(15 5 * * ? *)
+            Enabled: true
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: github_traffic_analyzer.handlers.api.handler
+      Description: Serves a dashboard UI and JSON API over the archived traffic data.
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TrafficArchiveTable
+      Events:
+        DashboardPage:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DashboardApi
+            Path: /
+            Method: GET
+        TrafficApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DashboardApi
+            Path: /api/traffic
+            Method: GET
+        HealthCheck:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DashboardApi
+            Path: /health
+            Method: GET
+
+Outputs:
+  DashboardUrl:
+    Description: URL for the dashboard.
+    Value: !Sub https://${DashboardApi}.execute-api.${AWS::Region}.amazonaws.com/
+  CollectorFunctionName:
+    Description: Collector Lambda function name.
+    Value: !Ref CollectorFunction
+  TrafficArchiveTableName:
+    Description: DynamoDB table that stores archived traffic data.
+    Value: !Ref TrafficArchiveTable
+

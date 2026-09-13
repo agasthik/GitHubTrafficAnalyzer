@@ -1,0 +1,1 @@
+"""GitHub traffic analyzer package."""

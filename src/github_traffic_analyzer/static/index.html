@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GitHub Traffic Analyzer</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2314213d'/%3E%3Cpath d='M14 44h8V30h-8zm14 0h8V20h-8zm14 0h8V12h-8z' fill='%23eb5e28'/%3E%3Cpath d='M12 48h40' stroke='%23fffaf4' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
+    <style>
+      :root {
+        --bg: #f7f0e8;
+        --panel: rgba(255, 252, 246, 0.78);
+        --panel-strong: rgba(255, 255, 255, 0.92);
+        --text: #14213d;
+        --muted: #56667f;
+        --accent: #eb5e28;
+        --accent-soft: #ffd6c7;
+        --accent-2: #3f88c5;
+        --border: rgba(20, 33, 61, 0.1);
+        --shadow: 0 22px 50px rgba(20, 33, 61, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        font-family: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top right, rgba(235, 94, 40, 0.18), transparent 28rem),
+          radial-gradient(circle at bottom left, rgba(63, 136, 197, 0.16), transparent 26rem),
+          linear-gradient(180deg, #fffaf4 0%, var(--bg) 100%);
+      }
+
+      .shell {
+        width: min(1180px, calc(100vw - 2rem));
+        margin: 0 auto;
+        padding: 2rem 0 4rem;
+      }
+
+      .hero {
+        position: relative;
+        overflow: hidden;
+        padding: 2.25rem;
+        border: 1px solid rgba(20, 33, 61, 0.08);
+        border-radius: 28px;
+        background:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 246, 238, 0.86)),
+          rgba(255, 255, 255, 0.8);
+        box-shadow: var(--shadow);
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: auto -6rem -8rem auto;
+        width: 18rem;
+        height: 18rem;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(235, 94, 40, 0.18), transparent 70%);
+      }
+
+      .eyebrow {
+        margin: 0 0 0.4rem;
+        color: var(--accent);
+        font-size: 0.85rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        font-weight: 500;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 3.5rem);
+        line-height: 0.95;
+        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+      }
+
+      .hero p {
+        max-width: 44rem;
+        font-size: 1.02rem;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1.25rem;
+      }
+
+      .meta-chip {
+        padding: 0.75rem 1rem;
+        border-radius: 999px;
+        border: 1px solid rgba(20, 33, 61, 0.08);
+        background: rgba(255, 255, 255, 0.7);
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .filters {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 0.9rem;
+        margin-top: 1.25rem;
+        align-items: end;
+      }
+
+      .filter-field {
+        display: grid;
+        gap: 0.4rem;
+      }
+
+      .filter-label {
+        color: var(--muted);
+        font-size: 0.82rem;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .filter-input {
+        width: 100%;
+        min-height: 3rem;
+        padding: 0.75rem 0.9rem;
+        border: 1px solid rgba(20, 33, 61, 0.14);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.92);
+        color: var(--text);
+        font: inherit;
+      }
+
+      .filter-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+      }
+
+      .filter-presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .preset-button {
+        min-height: 3rem;
+        padding: 0 1rem;
+        border: 1px solid rgba(20, 33, 61, 0.14);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.7);
+        color: var(--muted);
+        font: inherit;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: transform 160ms ease, background 160ms ease, color 160ms ease, border-color 160ms ease;
+      }
+
+      .preset-button:hover {
+        transform: translateY(-1px);
+      }
+
+      .preset-button.active {
+        background: var(--accent-soft);
+        border-color: transparent;
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .filter-button {
+        min-height: 3rem;
+        padding: 0.75rem 1rem;
+        border: 0;
+        border-radius: 16px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 160ms ease, opacity 160ms ease;
+      }
+
+      .filter-button:hover {
+        transform: translateY(-1px);
+      }
+
+      .filter-button.primary {
+        background: var(--accent);
+        color: #fffaf4;
+      }
+
+      .filter-button.secondary {
+        background: rgba(20, 33, 61, 0.08);
+        color: var(--text);
+      }
+
+      .filter-error {
+        margin-top: 0.9rem;
+        color: #b42318;
+        font-weight: 600;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 236px minmax(0, 1fr);
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+        align-items: start;
+      }
+
+      .repo-nav {
+        position: sticky;
+        top: 1.5rem;
+        padding: 1rem;
+        border-radius: 24px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        backdrop-filter: blur(12px);
+        box-shadow: var(--shadow);
+        max-height: calc(100vh - 3rem);
+        overflow-y: auto;
+      }
+
+      .repo-nav-title {
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.72rem;
+        font-weight: 500;
+        margin: 0 0 0.65rem;
+      }
+
+      .repo-nav-search {
+        width: 100%;
+        padding: 0.5rem 0.7rem;
+        margin-bottom: 0.75rem;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: var(--panel-strong);
+        color: var(--text);
+        font: inherit;
+        font-size: 0.88rem;
+      }
+
+      .repo-nav-list {
+        display: grid;
+        gap: 0.25rem;
+      }
+
+      .repo-nav-link {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 0.55rem 0.7rem;
+        border-radius: 12px;
+        border: none;
+        background: transparent;
+        color: var(--text);
+        font: inherit;
+        font-size: 0.9rem;
+        font-weight: 500;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background 140ms ease, color 140ms ease;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .repo-nav-link:hover {
+        background: rgba(247, 240, 232, 0.9);
+      }
+
+      .repo-nav-link.active {
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .repo-nav-empty {
+        color: var(--muted);
+        font-size: 0.85rem;
+        padding: 0.4rem 0.2rem;
+      }
+
+      .repo-section {
+        margin-top: 1.5rem;
+        padding: 1.5rem;
+        border-radius: 24px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        backdrop-filter: blur(12px);
+        box-shadow: var(--shadow);
+        animation: rise 480ms ease both;
+        scroll-margin-top: 1.5rem;
+      }
+
+      #app > .repo-section:first-child {
+        margin-top: 0;
+      }
+
+      .repo-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .repo-header h2 {
+        margin: 0;
+        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+        font-size: 2rem;
+      }
+
+      .repo-header a {
+        color: var(--accent-2);
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .repo-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .repo-anchor {
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 1.25rem;
+        font-weight: 700;
+        line-height: 1;
+        opacity: 0;
+        transition: opacity 140ms ease, color 140ms ease;
+      }
+
+      .repo-section:hover .repo-anchor,
+      .repo-anchor:focus-visible {
+        opacity: 1;
+      }
+
+      .repo-anchor:hover {
+        color: var(--accent);
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+        margin-top: 1.25rem;
+      }
+
+      .card,
+      .panel {
+        padding: 1rem;
+        border-radius: 20px;
+        border: 1px solid var(--border);
+        background: var(--panel-strong);
+      }
+
+      .card-label {
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.78rem;
+        font-weight: 500;
+      }
+
+      .card-value {
+        margin-top: 0.65rem;
+        font-size: 2rem;
+        font-weight: 600;
+      }
+
+      .card-subtext {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+
+      .panel h3 {
+        margin-top: 0;
+        margin-bottom: 0.75rem;
+        font-size: 1.1rem;
+      }
+
+      .chart-shell {
+        display: grid;
+        gap: 0.85rem;
+      }
+
+      .chart-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+      }
+
+      .chart-stat {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 0.45rem;
+        padding: 0.55rem 0.8rem;
+        border-radius: 999px;
+        background: rgba(247, 240, 232, 0.72);
+        color: var(--muted);
+        font-size: 0.84rem;
+        font-weight: 500;
+      }
+
+      .chart-stat strong {
+        color: var(--text);
+        font-size: 0.98rem;
+        font-weight: 600;
+      }
+
+      .chart {
+        width: 100%;
+        height: 220px;
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(63, 136, 197, 0.08), rgba(63, 136, 197, 0));
+      }
+
+      .chart-axis-label {
+        fill: var(--muted);
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .chart-grid-line {
+        stroke: rgba(20, 33, 61, 0.1);
+        stroke-width: 1;
+      }
+
+      .chart-point {
+        transition: r 140ms ease;
+      }
+
+      .chart-point:hover {
+        r: 6;
+      }
+
+      .chart-tag {
+        fill: rgba(255, 255, 255, 0.96);
+        stroke: rgba(20, 33, 61, 0.08);
+        stroke-width: 1;
+      }
+
+      .chart-tag-text {
+        fill: var(--text);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .list {
+        display: grid;
+        gap: 0.7rem;
+      }
+
+      .list-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.75rem;
+        align-items: center;
+        padding: 0.8rem 0.9rem;
+        border-radius: 16px;
+        background: rgba(247, 240, 232, 0.58);
+      }
+
+      .list-title {
+        font-weight: 600;
+        overflow-wrap: anywhere;
+      }
+
+      .list-detail {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .delta {
+        min-width: 3.5rem;
+        text-align: right;
+        font-weight: 600;
+      }
+
+      .delta.up {
+        color: #137547;
+      }
+
+      .delta.down {
+        color: #b42318;
+      }
+
+      .delta.flat {
+        color: var(--muted);
+      }
+
+      .empty {
+        color: var(--muted);
+        padding: 1rem 0;
+      }
+
+      .loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+        padding: 3.5rem 1rem;
+        color: var(--muted);
+      }
+
+      .spinner {
+        width: 2.75rem;
+        height: 2.75rem;
+        border-radius: 50%;
+        border: 4px solid var(--accent-soft);
+        border-top-color: var(--accent);
+        animation: spin 800ms linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .spinner {
+          animation-duration: 2s;
+        }
+      }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .to-top {
+        position: fixed;
+        right: 1.5rem;
+        bottom: 1.5rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.7rem 1.05rem;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fffaf4;
+        font: inherit;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        box-shadow: var(--shadow);
+        opacity: 0;
+        transform: translateY(12px);
+        pointer-events: none;
+        transition: opacity 200ms ease, transform 200ms ease;
+        z-index: 10;
+      }
+
+      .to-top.visible {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+
+      @media (max-width: 860px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .repo-nav {
+          position: static;
+          max-height: none;
+        }
+
+        #app > .repo-section:first-child {
+          margin-top: 1.5rem;
+        }
+      }
+
+      @media (max-width: 700px) {
+        .shell {
+          width: min(100vw - 1rem, 100%);
+          padding-top: 0.75rem;
+        }
+
+        .hero,
+        .repo-section {
+          padding: 1.1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">GitHub Traffic Archive</p>
+        <h1>Persistent GitHub traffic trends for the repos you care about.</h1>
+        <p>
+          This dashboard is powered by a scheduled Lambda collector that snapshots GitHub traffic
+          data into DynamoDB, then serves trends back through a lightweight API.
+        </p>
+        <div class="meta">
+          <div class="meta-chip" id="generated-at">Loading archive metadata…</div>
+          <div class="meta-chip" id="selected-range">Preparing selected range…</div>
+        </div>
+        <form class="filters" id="date-filter-form">
+          <label class="filter-field">
+            <span class="filter-label">Start Date</span>
+            <input class="filter-input" id="start-date" name="startDate" type="date" />
+          </label>
+          <label class="filter-field">
+            <span class="filter-label">End Date</span>
+            <input class="filter-input" id="end-date" name="endDate" type="date" />
+          </label>
+          <div class="filter-field">
+            <span class="filter-label">Actions</span>
+            <div class="filter-actions">
+              <button class="filter-button primary" type="submit">Apply Filter</button>
+              <button class="filter-button secondary" id="reset-filter" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="filter-field" style="grid-column: 1 / -1;">
+            <span class="filter-label">Quick Range</span>
+            <div class="filter-presets" id="preset-buttons">
+              <button class="preset-button" type="button" data-days="7">Last 7 days</button>
+              <button class="preset-button" type="button" data-days="30">Last 30 days</button>
+              <button class="preset-button" type="button" data-days="90">Last 90 days</button>
+              <button class="preset-button" type="button" data-days="all">All time</button>
+            </div>
+          </div>
+        </form>
+        <div class="filter-error" id="filter-error" hidden></div>
+      </section>
+
+      <div class="layout">
+        <nav class="repo-nav" id="repo-nav" aria-label="Tracked repositories">
+          <p class="repo-nav-title">Repositories</p>
+          <input
+            class="repo-nav-search"
+            id="repo-nav-search"
+            type="search"
+            placeholder="Filter repos…"
+            autocomplete="off"
+          />
+          <div class="repo-nav-list" id="repo-nav-list"></div>
+        </nav>
+        <div id="app"></div>
+      </div>
+    </main>
+
+    <button class="to-top" id="to-top" type="button" aria-label="Back to top">
+      ↑ Top
+    </button>
+
+    <script>
+      const app = document.getElementById("app");
+      const filterForm = document.getElementById("date-filter-form");
+      const startDateInput = document.getElementById("start-date");
+      const endDateInput = document.getElementById("end-date");
+      const resetFilterButton = document.getElementById("reset-filter");
+      const filterError = document.getElementById("filter-error");
+      const repoNavList = document.getElementById("repo-nav-list");
+      const repoNavSearch = document.getElementById("repo-nav-search");
+      const presetButtons = document.getElementById("preset-buttons");
+      let scrollSpyObserver = null;
+      let availableRange = { start: "", end: "" };
+
+      function numberFormat(value) {
+        return new Intl.NumberFormat().format(value ?? 0);
+      }
+
+      function formatDelta(value) {
+        if (value > 0) return `+${numberFormat(value)}`;
+        if (value < 0) return `-${numberFormat(Math.abs(value))}`;
+        return "0";
+      }
+
+      function deltaClass(value) {
+        if (value > 0) return "up";
+        if (value < 0) return "down";
+        return "flat";
+      }
+
+      function compactNumber(value) {
+        return new Intl.NumberFormat(undefined, {
+          notation: "compact",
+          maximumFractionDigits: value >= 1000 ? 1 : 0,
+        }).format(value ?? 0);
+      }
+
+      function chartIdFromKey(value) {
+        return value.replace(/[^a-zA-Z0-9_-]/g, "-");
+      }
+
+      function scrollToSection(id) {
+        const target = document.getElementById(id);
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }
+
+      function scrollToHash() {
+        const id = decodeURIComponent(window.location.hash.replace(/^#/, ""));
+        if (!id) return;
+        requestAnimationFrame(() => scrollToSection(id));
+      }
+
+      // Shift an ISO date (YYYY-MM-DD) by a number of days, staying in UTC.
+      function shiftDate(isoDate, deltaDays) {
+        const date = new Date(`${isoDate}T00:00:00Z`);
+        date.setUTCDate(date.getUTCDate() + deltaDays);
+        return date.toISOString().slice(0, 10);
+      }
+
+      // Compute the [start, end] a preset resolves to against the archived range.
+      // "all" clears the filter (empty strings); an N-day window ends at the
+      // latest archived date and is clamped to the earliest archived date.
+      function presetRange(days) {
+        if (days === "all" || !availableRange.end) {
+          return { startDate: "", endDate: "" };
+        }
+        const end = availableRange.end;
+        let start = shiftDate(end, -(Number(days) - 1));
+        if (availableRange.start && start < availableRange.start) {
+          start = availableRange.start;
+        }
+        return { startDate: start, endDate: end };
+      }
+
+      // Highlight the preset whose resolved range matches the active filter.
+      function highlightActivePreset() {
+        const current = currentFilters();
+        presetButtons.querySelectorAll(".preset-button").forEach((button) => {
+          const range = presetRange(button.dataset.days);
+          const match =
+            range.startDate === current.startDate && range.endDate === current.endDate;
+          button.classList.toggle("active", match);
+        });
+      }
+
+      function niceStep(maxValue, segments) {
+        const roughStep = Math.max(maxValue / segments, 1);
+        const magnitude = 10 ** Math.floor(Math.log10(roughStep));
+        const normalized = roughStep / magnitude;
+        if (normalized <= 1) return magnitude;
+        if (normalized <= 2) return 2 * magnitude;
+        if (normalized <= 5) return 5 * magnitude;
+        return 10 * magnitude;
+      }
+
+      function createLineChart(points, stroke, chartKey) {
+        if (!points.length) {
+          return `<div class="empty">No archived points yet.</div>`;
+        }
+
+        const width = 680;
+        const height = 220;
+        const margin = { top: 18, right: 16, bottom: 34, left: 52 };
+        const values = points.map((point) => point.count);
+        const peakValue = Math.max(...values);
+        const maxValue = Math.max(peakValue, 1);
+        const minValue = Math.min(...values);
+        const latestIndex = points.length - 1;
+        const peakIndex = values.indexOf(peakValue);
+        const segments = 4;
+        const step = niceStep(maxValue, segments);
+        const axisMax = Math.max(step * segments, Math.ceil(maxValue / step) * step);
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+        const gradientId = `fill-${chartIdFromKey(chartKey)}`;
+
+        const plottedPoints = points.map((point, index) => {
+          const x = margin.left + (index * chartWidth) / Math.max(points.length - 1, 1);
+          const y = margin.top + chartHeight - (point.count / axisMax) * chartHeight;
+          return { ...point, x, y };
+        });
+        const latestPoint = plottedPoints[latestIndex];
+        const peakPoint = plottedPoints[peakIndex];
+
+        const coordinates = plottedPoints.map((point) => `${point.x},${point.y}`);
+        const areaPoints = [
+          `${margin.left},${height - margin.bottom}`,
+          ...coordinates,
+          `${width - margin.right},${height - margin.bottom}`,
+        ].join(" ");
+
+        const gridLines = Array.from({ length: segments + 1 }, (_, index) => {
+          const tickValue = axisMax - index * step;
+          const y = margin.top + (index * chartHeight) / segments;
+          return `
+            <g>
+              <line class="chart-grid-line" x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}"></line>
+              <text class="chart-axis-label" x="${margin.left - 8}" y="${y + 4}" text-anchor="end">${compactNumber(tickValue)}</text>
+            </g>
+          `;
+        }).join("");
+
+        const xAxisIndexes = Array.from(new Set([0, Math.floor((points.length - 1) / 2), points.length - 1]));
+        const xAxisLabels = xAxisIndexes.map((index, labelIndex) => {
+          const point = plottedPoints[index];
+          const anchor = labelIndex === 0 ? "start" : labelIndex === xAxisIndexes.length - 1 ? "end" : "middle";
+          return `<text class="chart-axis-label" x="${point.x}" y="${height - 10}" text-anchor="${anchor}">${point.date}</text>`;
+        }).join("");
+
+        const pointMarkers = plottedPoints.map((point, index) => `
+          <circle class="chart-point" cx="${point.x}" cy="${point.y}" r="${index === latestIndex ? 4.5 : 3.5}" fill="${stroke}">
+            <title>${point.date}: ${numberFormat(point.count)}</title>
+          </circle>
+        `).join("");
+
+        const tagWidth = 44;
+        const latestTagX = Math.min(Math.max(latestPoint.x - tagWidth / 2, margin.left), width - margin.right - tagWidth);
+        const peakTagX = Math.min(Math.max(peakPoint.x - tagWidth / 2, margin.left), width - margin.right - tagWidth);
+        const latestTagY = Math.max(latestPoint.y - 32 + (latestIndex === peakIndex ? 24 : 0), margin.top + 4);
+        const peakTagY = Math.max(peakPoint.y - 32, margin.top + 4);
+
+        return `
+          <div class="chart-shell">
+            <div class="chart-stats">
+              <div class="chart-stat">Latest <strong>${numberFormat(latestPoint.count)}</strong></div>
+              <div class="chart-stat">Peak <strong>${numberFormat(peakPoint.count)}</strong></div>
+              <div class="chart-stat">Low <strong>${numberFormat(minValue)}</strong></div>
+            </div>
+            <svg class="chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="Traffic trend chart">
+              <defs>
+                <linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="${stroke}" stop-opacity="0.35"></stop>
+                  <stop offset="100%" stop-color="${stroke}" stop-opacity="0.02"></stop>
+                </linearGradient>
+              </defs>
+              ${gridLines}
+              <polyline fill="url(#${gradientId})" stroke="none" points="${areaPoints}"></polyline>
+              <polyline fill="none" stroke="${stroke}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="${coordinates.join(" ")}"></polyline>
+              ${pointMarkers}
+              <g>
+                <rect class="chart-tag" x="${peakTagX}" y="${peakTagY}" width="${tagWidth}" height="20" rx="10"></rect>
+                <text class="chart-tag-text" x="${peakTagX + tagWidth / 2}" y="${peakTagY + 14}" text-anchor="middle">${compactNumber(peakPoint.count)}</text>
+              </g>
+              <g>
+                <rect class="chart-tag" x="${latestTagX}" y="${latestTagY}" width="${tagWidth}" height="20" rx="10"></rect>
+                <text class="chart-tag-text" x="${latestTagX + tagWidth / 2}" y="${latestTagY + 14}" text-anchor="middle">${compactNumber(latestPoint.count)}</text>
+              </g>
+              ${xAxisLabels}
+            </svg>
+          </div>
+        `;
+      }
+
+      function renderList(items, emptyMessage, titleSelector) {
+        if (!items.length) {
+          return `<div class="empty">${emptyMessage}</div>`;
+        }
+
+        return `<div class="list">${items
+          .map((item) => {
+            const title = titleSelector(item);
+            return `
+              <div class="list-item">
+                <div>
+                  <div class="list-title">${title}</div>
+                  <div class="list-detail">
+                    ${numberFormat(item.count)} events · ${numberFormat(item.uniques)} daily uniques
+                  </div>
+                </div>
+                <div class="delta ${deltaClass(item.countDelta)}">${formatDelta(item.countDelta)}</div>
+              </div>
+            `;
+          })
+          .join("")}</div>`;
+      }
+
+      function renderRepository(repository) {
+        const repoUrl = `https://github.com/${repository.fullName}`;
+        const targetId = `repo-${chartIdFromKey(repository.fullName)}`;
+        return `
+          <section class="repo-section" id="${targetId}">
+            <div class="repo-header">
+              <div>
+                <h2 class="repo-title">
+                  ${repository.label}
+                  <a class="repo-anchor" href="#${targetId}" aria-label="Link to ${repository.label}" title="Copy link to this repository">#</a>
+                </h2>
+                <div class="card-subtext">Tracking ${repository.fullName}</div>
+              </div>
+              <a href="${repoUrl}" target="_blank" rel="noreferrer">${repoUrl}</a>
+            </div>
+
+            <div class="cards">
+              <div class="card">
+                <div class="card-label">Views · Selected Range</div>
+                <div class="card-value">${numberFormat(repository.viewsSummary.count)}</div>
+                <div class="card-subtext">
+                  ${numberFormat(repository.viewsSummary.dailyUniqueSum)} daily unique sum ·
+                  ${formatDelta(repository.viewsSummary.changeFromPreviousWindow)} vs prior window
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-label">Clones · Selected Range</div>
+                <div class="card-value">${numberFormat(repository.clonesSummary.count)}</div>
+                <div class="card-subtext">
+                  ${numberFormat(repository.clonesSummary.dailyUniqueSum)} daily unique sum ·
+                  ${formatDelta(repository.clonesSummary.changeFromPreviousWindow)} vs prior window
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-label">History Window</div>
+                <div class="card-value">${repository.historyStart ? repository.historyStart.slice(0, 10) : "—"}</div>
+                <div class="card-subtext">
+                  through ${repository.historyEnd ? repository.historyEnd.slice(0, 10) : "—"}
+                </div>
+              </div>
+            </div>
+
+            <div class="grid">
+              <div class="panel">
+                <h3>Views Trend</h3>
+                ${createLineChart(repository.viewsSeries, "#eb5e28", `${repository.fullName}-views`)}
+              </div>
+              <div class="panel">
+                <h3>Clones Trend</h3>
+                ${createLineChart(repository.clonesSeries, "#3f88c5", `${repository.fullName}-clones`)}
+              </div>
+            </div>
+
+            <div class="grid">
+              <div class="panel">
+                <h3>Top Referrers</h3>
+                ${renderList(repository.topReferrers, "Referrer snapshots will appear after the first successful collection.", (item) => item.name)}
+              </div>
+              <div class="panel">
+                <h3>Top Paths</h3>
+                ${renderList(repository.topPaths, "Popular path snapshots will appear after the first successful collection.", (item) => item.title)}
+              </div>
+            </div>
+          </section>
+        `;
+      }
+
+      function renderRepoNav(repositories) {
+        if (scrollSpyObserver) {
+          scrollSpyObserver.disconnect();
+          scrollSpyObserver = null;
+        }
+
+        if (!repositories.length) {
+          repoNavList.innerHTML = `<p class="repo-nav-empty">No repositories tracked yet.</p>`;
+          repoNavSearch.hidden = true;
+          return;
+        }
+
+        repoNavSearch.hidden = false;
+        repoNavList.innerHTML = repositories
+          .map((repository) => {
+            const targetId = `repo-${chartIdFromKey(repository.fullName)}`;
+            return `<a class="repo-nav-link" href="#${targetId}" data-target="${targetId}" data-label="${repository.label.toLowerCase()} ${repository.fullName.toLowerCase()}">${repository.label}</a>`;
+          })
+          .join("");
+
+        const links = Array.from(repoNavList.querySelectorAll(".repo-nav-link"));
+
+        links.forEach((link) => {
+          link.addEventListener("click", (event) => {
+            const target = document.getElementById(link.dataset.target);
+            if (target) {
+              event.preventDefault();
+              scrollToSection(link.dataset.target);
+              history.replaceState({}, "", `#${link.dataset.target}`);
+            }
+          });
+        });
+
+        // Scroll-spy: highlight the nav link for the section nearest the top.
+        const linkByTarget = new Map(links.map((link) => [link.dataset.target, link]));
+        const visible = new Set();
+        const setActive = (id) => {
+          links.forEach((link) => link.classList.toggle("active", link.dataset.target === id));
+        };
+        scrollSpyObserver = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                visible.add(entry.target.id);
+              } else {
+                visible.delete(entry.target.id);
+              }
+            });
+            const topmost = Array.from(visible).sort(
+              (a, b) =>
+                document.getElementById(a).offsetTop - document.getElementById(b).offsetTop,
+            )[0];
+            if (topmost) {
+              setActive(topmost);
+            }
+          },
+          { rootMargin: "-10% 0px -70% 0px", threshold: 0 },
+        );
+
+        links.forEach((link) => {
+          const section = document.getElementById(link.dataset.target);
+          if (section) {
+            scrollSpyObserver.observe(section);
+          }
+        });
+
+        if (links.length) {
+          setActive(links[0].dataset.target);
+        }
+      }
+
+      function filterRepoNav(query) {
+        const term = query.trim().toLowerCase();
+        repoNavList.querySelectorAll(".repo-nav-link").forEach((link) => {
+          link.hidden = term ? !link.dataset.label.includes(term) : false;
+        });
+      }
+
+      function currentFilters() {
+        const params = new URLSearchParams(window.location.search);
+        return {
+          startDate: params.get("startDate") || "",
+          endDate: params.get("endDate") || "",
+        };
+      }
+
+      function updateUrl(startDate, endDate) {
+        const url = new URL(window.location.href);
+        if (startDate) {
+          url.searchParams.set("startDate", startDate);
+        } else {
+          url.searchParams.delete("startDate");
+        }
+        if (endDate) {
+          url.searchParams.set("endDate", endDate);
+        } else {
+          url.searchParams.delete("endDate");
+        }
+        window.history.replaceState({}, "", url);
+      }
+
+      function rangeLabel(payload) {
+        if (!payload.selectedStartDate || !payload.selectedEndDate) {
+          return "No archive range available yet";
+        }
+        return `Showing ${payload.selectedStartDate} through ${payload.selectedEndDate}`;
+      }
+
+      function applyInputBounds(payload) {
+        availableRange = {
+          start: payload.availableStartDate || "",
+          end: payload.availableEndDate || "",
+        };
+        startDateInput.min = payload.availableStartDate || "";
+        startDateInput.max = payload.availableEndDate || "";
+        endDateInput.min = payload.availableStartDate || "";
+        endDateInput.max = payload.availableEndDate || "";
+        startDateInput.value = payload.selectedStartDate || "";
+        endDateInput.value = payload.selectedEndDate || "";
+      }
+
+      function setFilterError(message) {
+        filterError.hidden = !message;
+        filterError.textContent = message || "";
+      }
+
+      async function load() {
+        const generatedAt = document.getElementById("generated-at");
+        const selectedRange = document.getElementById("selected-range");
+        const filters = currentFilters();
+        app.innerHTML = `
+          <section class="repo-section">
+            <div class="loading">
+              <div class="spinner" role="status" aria-label="Loading traffic data"></div>
+              <div>Loading traffic archive…</div>
+            </div>
+          </section>
+        `;
+        const apiUrl = new URL("/api/traffic", window.location.origin);
+        if (filters.startDate) {
+          apiUrl.searchParams.set("startDate", filters.startDate);
+        }
+        if (filters.endDate) {
+          apiUrl.searchParams.set("endDate", filters.endDate);
+        }
+
+        try {
+          const response = await fetch(apiUrl, { headers: { accept: "application/json" } });
+          if (!response.ok) {
+            const errorPayload = await response.json().catch(() => ({ message: `Dashboard API returned ${response.status}` }));
+            throw new Error(errorPayload.message || `Dashboard API returned ${response.status}`);
+          }
+
+          const payload = await response.json();
+          generatedAt.textContent = `Generated ${new Date(payload.generatedAt).toLocaleString()}`;
+          selectedRange.textContent = rangeLabel(payload);
+          applyInputBounds(payload);
+          highlightActivePreset();
+          setFilterError("");
+          app.innerHTML = payload.repositories.map(renderRepository).join("");
+          renderRepoNav(payload.repositories);
+          filterRepoNav(repoNavSearch.value);
+          scrollToHash();
+        } catch (error) {
+          generatedAt.textContent = "Unable to load archive metadata";
+          selectedRange.textContent = "Check the API deployment and try again";
+          setFilterError(error.message);
+          renderRepoNav([]);
+          app.innerHTML = `
+            <section class="repo-section">
+              <div class="panel">
+                <h3>Dashboard unavailable</h3>
+                <p class="empty">${error.message}</p>
+              </div>
+            </section>
+          `;
+        }
+      }
+
+      filterForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const startDate = startDateInput.value;
+        const endDate = endDateInput.value;
+
+        if (startDate && endDate && startDate > endDate) {
+          setFilterError("Start date must be on or before end date.");
+          return;
+        }
+
+        updateUrl(startDate, endDate);
+        await load();
+      });
+
+      resetFilterButton.addEventListener("click", async () => {
+        startDateInput.value = "";
+        endDateInput.value = "";
+        updateUrl("", "");
+        await load();
+      });
+
+      presetButtons.addEventListener("click", async (event) => {
+        const button = event.target.closest(".preset-button");
+        if (!button) return;
+        const { startDate, endDate } = presetRange(button.dataset.days);
+        startDateInput.value = startDate;
+        endDateInput.value = endDate;
+        updateUrl(startDate, endDate);
+        await load();
+      });
+
+      repoNavSearch.addEventListener("input", (event) => {
+        filterRepoNav(event.target.value);
+      });
+
+      const toTopButton = document.getElementById("to-top");
+      toTopButton.addEventListener("click", () => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+      window.addEventListener(
+        "scroll",
+        () => {
+          toTopButton.classList.toggle("visible", window.scrollY > 400);
+        },
+        { passive: true },
+      );
+
+      load();
+    </script>
+  </body>
+</html>

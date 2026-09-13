@@ -1,0 +1,23 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(sam deploy*)",
+            "statusMessage": "Running ruff before deploy...",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" || exit 0; ruff check src tests && ruff format --check src tests || { echo 'BLOCKED: fix ruff lint/format before deploying. Run: ruff check --fix src tests && ruff format src tests' >&2; exit 2; }"
+          },
+          {
+            "type": "command",
+            "if": "Bash(git push*)",
+            "statusMessage": "Running ruff before push...",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" || exit 0; ruff check src tests && ruff format --check src tests || { echo 'BLOCKED: fix ruff lint/format before pushing. Run: ruff check --fix src tests && ruff format src tests' >&2; exit 2; }"
+          }
+        ]
+      }
+    ]
+  }
+}

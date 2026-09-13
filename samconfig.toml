@@ -1,0 +1,14 @@
+version = 0.1
+
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "github-traffic-analyzer"
+resolve_s3 = true
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+region = "us-east-1"
+# Replace the placeholder below with the repositories you want to archive. Each
+# entry is {"owner","name","label"}; add more objects to the array to track more
+# repos. Your GitHub token must have push access to every repo listed here.
+parameter_overrides = "TrackedRepositories='[{\"owner\":\"your-org\",\"name\":\"your-repo\",\"label\":\"Your Repository\"}]'"

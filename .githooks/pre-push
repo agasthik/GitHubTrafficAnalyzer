@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+#
+# pre-push hook: run the ruff gate before allowing any push.
+#
+# This hook is versioned in the repo under .githooks/ and activated via
+# `git config core.hooksPath .githooks` (see scripts/install-hooks.sh).
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+exec "$REPO_ROOT/scripts/ruff-gate.sh"
